@@ -36,14 +36,8 @@ namespace GamesList.Classes
             set { _have = value; }
         }
 
-        public override string ToString()
-        {
-            return Name;
-        }
+        public override string ToString() => Name;
 
-        public static int CompareByName(Platform a, Platform b)
-        {
-            return string.Compare(a.Name, b.Name);
-        }
+        public static int CompareByName(Platform a, Platform b) => string.Compare(a.Name, b.Name);
     }
 }

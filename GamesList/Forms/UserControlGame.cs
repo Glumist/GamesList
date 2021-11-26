@@ -8,13 +8,14 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using GamesList.Classes;
+using System.Runtime.CompilerServices;
 
 namespace GamesList.Forms
 {
     public partial class UserControlGame : UserControl
     {
         public Game EditedGame;
-        private bool changed;
+        private bool changed = false;
 
         private List<Game.GameBundle> bundles;
         private List<Genre> genres;
@@ -35,15 +36,15 @@ namespace GamesList.Forms
             cbStatus.Items.Add("Ожидает перевода");
             cbStatus.Items.Add("Неизвестно");
             cbStatus.SelectedIndex = 0;
-            
-            SetGame(new Game());
+
+            ClearGame();
         }
 
         public void SetGame(Game game)
         {
             if (changed)
             {
-                DialogResult dialogResult = MessageBox.Show("Имеются несохраненные данны. Сохранить?", "Сохранение", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                DialogResult dialogResult = MessageBox.Show("Имеются несохраненные данные. Сохранить?", "Сохранение", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
                 if (dialogResult == DialogResult.Yes)
                     Save();
                 else if (dialogResult == DialogResult.Cancel)
@@ -53,7 +54,7 @@ namespace GamesList.Forms
             bundles = new List<Game.GameBundle>(game.Bundles);
             genres = new List<Genre>(game.Genres);
             platforms = new List<Game.GamePlatform>(game.Platforms);
-            
+
             EditedGame = game;
 
             tbName.Text = game.Name;
@@ -78,9 +79,10 @@ namespace GamesList.Forms
 
         public void ClearGame()
         {
+            changed = false;
             SetGame(new Game());
         }
-        
+
         private void fieldValue_Changed(object sender, EventArgs e)
         {
             changed = true;
@@ -103,10 +105,7 @@ namespace GamesList.Forms
 
         private void tsmiBundleDelete_Click(object sender, EventArgs e)
         {
-            if (dgvBundles.SelectedRows.Count == 0 || dgvBundles.SelectedRows[0].Index == -1)
-                return;
-
-            Game.GameBundle selectedBundle = dgvBundles.SelectedRows[0].DataBoundItem as Game.GameBundle;
+            Game.GameBundle selectedBundle = GetSelectedBundle();
             if (selectedBundle == null)
                 return;
 
@@ -222,10 +221,7 @@ namespace GamesList.Forms
 
         private void tsmiGenreDelete_Click(object sender, EventArgs e)
         {
-            if (dgvGenres.SelectedRows.Count == 0 || dgvGenres.SelectedRows[0].Index == -1)
-                return;
-
-            Genre selectedGenre = dgvGenres.SelectedRows[0].DataBoundItem as Genre;
+            Genre selectedGenre = GetSelectedGenre();
             if (selectedGenre == null)
                 return;
 
@@ -233,6 +229,61 @@ namespace GamesList.Forms
             dgvGenres.DataSource = new List<Genre>(genres);
 
             fieldValue_Changed(sender, e);
+        }
+
+        #endregion
+
+        #region Tables
+
+        private void dgvBundles_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            Game.GameBundle selectedBundle = GetSelectedBundle();
+            if (selectedBundle == null)
+                return;
+
+            OnBundleSelected(selectedBundle.Bundle);
+        }
+
+        private void dgvPlatforms_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            Game.GamePlatform selectedPlatdorm = GetSelectedPlatform();
+            if (selectedPlatdorm == null)
+                return;
+
+            OnPlatformSelected(selectedPlatdorm.Platform);
+        }
+
+        private void dgvGenres_CellContentDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            Genre selectedGenre = GetSelectedGenre();
+            if (selectedGenre == null)
+                return;
+
+            OnGenreSelected(selectedGenre);
+        }
+
+        private Game.GameBundle GetSelectedBundle()
+        {
+            if (dgvBundles.SelectedRows.Count == 0 || dgvBundles.SelectedRows[0].Index == -1)
+                return null;
+
+            return dgvBundles.SelectedRows[0].DataBoundItem as Game.GameBundle;
+        }
+
+        private Game.GamePlatform GetSelectedPlatform()
+        {
+            if (dgvPlatforms.SelectedRows.Count == 0 || dgvPlatforms.SelectedRows[0].Index == -1)
+                return null;
+
+            return dgvPlatforms.SelectedRows[0].DataBoundItem as Game.GamePlatform;
+        }
+
+        private Genre GetSelectedGenre()
+        {
+            if (dgvGenres.SelectedRows.Count == 0 || dgvGenres.SelectedRows[0].Index == -1)
+                return null;
+
+            return dgvGenres.SelectedRows[0].DataBoundItem as Genre;
         }
 
         #endregion
@@ -249,14 +300,6 @@ namespace GamesList.Forms
                 case 3: return Game.GamePlatform.GameStatus.WaitTranslation;
                 default: return Game.GamePlatform.GameStatus.Unknown;
             }
-        }
-
-        private Game.GamePlatform GetSelectedPlatform()
-        {
-            if (dgvPlatforms.SelectedRows.Count == 0 || dgvPlatforms.SelectedRows[0].Index == -1)
-                return null;
-
-            return dgvPlatforms.SelectedRows[0].DataBoundItem as Game.GamePlatform;
         }
 
         private void SelectPlatform(Game.GamePlatform platform)
@@ -289,6 +332,44 @@ namespace GamesList.Forms
             EditedGame.Genres = genres;
 
             changed = false;
+
+            OnGameSaved(EditedGame);
         }
+
+        #region Events
+
+        public event EventHandler<Game> GameSaved;
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        protected virtual void OnGameSaved(Game game)
+        {
+            if (GameSaved != null)
+                GameSaved(this, game);
+        }
+
+        public event EventHandler<Bundle> BundleSelected;
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        protected virtual void OnBundleSelected(Bundle bundle)
+        {
+            if (BundleSelected != null)
+                BundleSelected(this, bundle);
+        }
+
+        public event EventHandler<Platform> PlatformSelected;
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        protected virtual void OnPlatformSelected(Platform platform)
+        {
+            if (PlatformSelected != null)
+                PlatformSelected(this, platform);
+        }
+
+        public event EventHandler<Genre> GenreSelected;
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        protected virtual void OnGenreSelected(Genre genre)
+        {
+            if (GenreSelected != null)
+                GenreSelected(this, genre);
+        }
+
+        #endregion
     }
 }

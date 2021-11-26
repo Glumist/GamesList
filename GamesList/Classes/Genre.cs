@@ -22,14 +22,8 @@ namespace GamesList.Classes
             set { _name = value; }
         }
 
-        public override string ToString()
-        {
-            return Name;
-        }
+        public override string ToString() => Name;
 
-        public static int CompareByName(Genre a, Genre b)
-        {
-            return string.Compare(a.Name, b.Name);
-        }
+        public static int CompareByName(Genre a, Genre b) => string.Compare(a.Name, b.Name);
     }
 }

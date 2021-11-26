@@ -26,6 +26,11 @@ namespace GamesList.Forms
 
             dgvGroups.AutoGenerateColumns = false;
             dgvGames.AutoGenerateColumns = false;
+
+            ucGame.GameSaved += UcGame_GameSaved;
+            ucGame.BundleSelected += UcGame_BundleSelected;
+            ucGame.PlatformSelected += UcGame_PlatformSelected;
+            ucGame.GenreSelected += UcGame_GenreSelected;
         }
 
         private void FormMain_Load(object sender, EventArgs e)
@@ -203,27 +208,27 @@ namespace GamesList.Forms
                     ColorRow(row, Game.ColorByStatus(Game.GamePlatform.GameStatus.Playing));
                 else if (bundleGames.Exists(bg => bg.Status == Game.GamePlatform.GameStatus.OnHold))
                     ColorRow(row, Game.ColorByStatus(Game.GamePlatform.GameStatus.OnHold));
-                else if (_gamesCollection.GetNextGamesInBundle(bundle).Count == 0)
-                {
-                    if (bundleGames.Exists(bg => bg.Status == Game.GamePlatform.GameStatus.WaitTranslation))
-                        ColorRow(row, Game.ColorByStatus(Game.GamePlatform.GameStatus.WaitTranslation));
-                    else
-                        ColorRow(row, Game.ColorByStatus(Game.GamePlatform.GameStatus.Completed));
-                }
                 else
                 {
                     List<Game> nextGames = _gamesCollection.GetNextGamesInBundle(bundle);
                     if (nextGames.Count == 0)
-                        continue;
-
-                    if (nextGames[0].Date > DateTime.Today)
-                        ColorRow(row, Game.NotYetReleased);
-                    else if (nextGames[0].Status == Game.GamePlatform.GameStatus.NotPlayed)
-                        ColorRow(row, Game.ColorByStatus(Game.GamePlatform.GameStatus.NotPlayed));
-                    else if (nextGames[0].Status == Game.GamePlatform.GameStatus.Finished)
-                        ColorRow(row, Game.ColorByStatus(Game.GamePlatform.GameStatus.Finished));
-                    else if (nextGames[0].Status == Game.GamePlatform.GameStatus.Watched)
-                        ColorRow(row, Game.ColorByStatus(Game.GamePlatform.GameStatus.Watched));
+                    {
+                        if (bundleGames.Exists(bg => bg.Status == Game.GamePlatform.GameStatus.WaitTranslation))
+                            ColorRow(row, Game.ColorByStatus(Game.GamePlatform.GameStatus.WaitTranslation));
+                        else
+                            ColorRow(row, Game.ColorByStatus(Game.GamePlatform.GameStatus.Completed));
+                    }
+                    else
+                    {
+                        if (nextGames[0].Status == Game.GamePlatform.GameStatus.NotYetReleased)
+                            ColorRow(row, Game.ColorByStatus(Game.GamePlatform.GameStatus.NotYetReleased));
+                        else if (nextGames[0].Status == Game.GamePlatform.GameStatus.NotPlayed)
+                            ColorRow(row, Game.ColorByStatus(Game.GamePlatform.GameStatus.NotPlayed));
+                        else if (nextGames[0].Status == Game.GamePlatform.GameStatus.Finished)
+                            ColorRow(row, Game.ColorByStatus(Game.GamePlatform.GameStatus.Finished));
+                        else if (nextGames[0].Status == Game.GamePlatform.GameStatus.Watched)
+                            ColorRow(row, Game.ColorByStatus(Game.GamePlatform.GameStatus.Watched));
+                    }
                 }
             }
         }
@@ -416,7 +421,7 @@ namespace GamesList.Forms
 
         private void SelectGenre(Genre genre)
         {
-            if (tscbGroup.SelectedIndex != 1)
+            if (tscbGroup.SelectedIndex != 2)
                 return;
 
             foreach (DataGridViewRow row in dgvGroups.Rows)
@@ -474,24 +479,26 @@ namespace GamesList.Forms
 
         private void RefreshChart()
         {
-            Dictionary<Color, int> colorsCounts = new Dictionary<Color, int>();
+            Dictionary<Game.GamePlatform.GameStatus, int> colorsCounts = new Dictionary<Game.GamePlatform.GameStatus, int>();
 
             foreach (DataGridViewRow row in dgvGames.Rows)
             {
                 Game game = GetGameFromRow(row);
-                if (!colorsCounts.ContainsKey(game.Color))
-                    colorsCounts.Add(game.Color, 0);
-                colorsCounts[game.Color]++;
+                if (!colorsCounts.ContainsKey(game.Status))
+                    colorsCounts.Add(game.Status, 0);
+                colorsCounts[game.Status]++;
             }
 
             Series series = chart.Series[0];
             series.Points.Clear();
-            foreach (Color key in colorsCounts.Keys)
+            foreach (Game.GamePlatform.GameStatus key in colorsCounts.Keys)
             {
                 int pointNum = series.Points.AddY(colorsCounts[key]);
                 DataPoint point = series.Points[pointNum];
-                point.Color = key;
-                point.Label = colorsCounts[key].ToString();
+                point.Color = Game.ColorByStatus(key);
+                point.IsValueShownAsLabel = true;
+                point.ToolTip = key.ToString();
+                //point.Label = colorsCounts[key].ToString();
             }
         }
 
@@ -648,13 +655,16 @@ namespace GamesList.Forms
 
         private void tsbGameAdd_Click(object sender, EventArgs e)
         {
-            Game newGame = new Game() { Date = DateTime.Today };
+            Game newGame = new Game();
 
             Bundle selectedBundle = GetSelectedBundle();
             if (selectedBundle != null && IsBundleReal(selectedBundle))
                 newGame.Bundles.Add(_gamesCollection.GetGameBundle(selectedBundle));
 
-            FormGame form = new FormGame(newGame);
+            ucGame.SetGame(newGame);
+            ucGame.BringToFront();
+
+            /*FormGame form = new FormGame(newGame);
             if (form.ShowDialog() != DialogResult.OK)
                 return;
 
@@ -662,25 +672,10 @@ namespace GamesList.Forms
             Save();
             RefreshGamesTable();
 
-            SelectGame(form.EditedGame);
+            SelectGame(form.EditedGame);*/
         }
 
-        private void tsbGameEdit_Click(object sender, EventArgs e)
-        {
-            Game selectedGame = GetSelectedGame();
-            if (selectedGame == null)
-                return;
-
-            DateTime gameDate = selectedGame.Date;
-            if (new FormGame(selectedGame).ShowDialog() != DialogResult.OK)
-                return;
-
-            if (gameDate != selectedGame.Date)
-                _gamesCollection.Games.Sort(Game.CompareByDate);
-            Save();
-            RefreshGamesTable();
-            SelectGame(selectedGame);
-        }
+        private void tsbGameEdit_Click(object sender, EventArgs e) => EditGame();
 
         private void tsbGameDelete_Click(object sender, EventArgs e)
         {
@@ -834,6 +829,40 @@ namespace GamesList.Forms
             }
         }
 
+        private void EditGame()
+        {
+            Game selectedGame = GetSelectedGame();
+            if (selectedGame == null)
+                return;
+
+            ucGame.SetGame(selectedGame);
+
+            /*DateTime gameDate = selectedGame.Date;
+            if (new FormGame(selectedGame).ShowDialog() != DialogResult.OK)
+                return;
+
+            if (gameDate != selectedGame.Date)
+                _gamesCollection.Games.Sort(Game.CompareByDate);
+            Save();
+            RefreshGamesTable();
+            SelectGame(selectedGame);*/
+        }
+
+        private void dgvGames_SelectionChanged(object sender, EventArgs e)
+        {
+            Game selectedGame = GetSelectedGame();
+            if (selectedGame != null)
+            {
+                ucGame.BringToFront();
+                ucGame.SetGame(selectedGame);
+            }
+            else
+            {
+                ucGame.ClearGame();
+                pEmpty.BringToFront();
+            }
+        }
+
         #endregion
 
         public class MultiColorDataGridViewTextBoxCell : DataGridViewTextBoxCell
@@ -932,7 +961,7 @@ namespace GamesList.Forms
                 result.Add(Game.ColorByStatus(Game.GamePlatform.GameStatus.Watched), 0);
                 result.Add(Game.ColorByStatus(Game.GamePlatform.GameStatus.Finished), 0);
                 result.Add(Game.ColorByStatus(Game.GamePlatform.GameStatus.Completed), 0);
-                result.Add(Game.NotYetReleased, 0);
+                result.Add(Game.ColorByStatus(Game.GamePlatform.GameStatus.NotYetReleased), 0);
                 result.Add(Game.ColorByStatus(Game.GamePlatform.GameStatus.Unknown), 0);
 
                 foreach (Game game in games)
@@ -1012,6 +1041,53 @@ namespace GamesList.Forms
                         return TextFormatFlags.VerticalCenter | TextFormatFlags.Left;
                 }
             }
+        }
+
+        private void chart_Click(object sender, EventArgs e)
+        {
+            Point pos = System.Windows.Forms.Cursor.Position;
+            Point clientpos = chart.PointToClient(pos);
+            HitTestResult contr = chart.HitTest(clientpos.X, clientpos.Y);
+            if (contr.Series != null && contr.PointIndex != -1)
+                MessageBox.Show(contr.ChartElementType.ToString() + Environment.NewLine + contr.Series.Points[contr.PointIndex]);
+        }
+
+        //private void dgvGames_CellDoubleClick(object sender, DataGridViewCellEventArgs e) => EditGame();
+
+        private void UcGame_GameSaved(object sender, Game game)
+        {
+            if (!_gamesCollection.Games.Contains(game))
+                _gamesCollection.Add(game);
+            else 
+                _gamesCollection.Games.Sort(Game.CompareByDate);
+
+            Save();
+            RefreshGamesTable();
+            SelectGame(game);
+        }
+
+        private void UcGame_BundleSelected(object sender, Bundle e)
+        {
+            Game selectedGame = ucGame.EditedGame;
+            tscbGroup.SelectedIndex = 0;
+            SelectBundle(e);
+            SelectGame(selectedGame);
+        }
+
+        private void UcGame_PlatformSelected(object sender, Platform e)
+        {
+            Game selectedGame = ucGame.EditedGame;
+            tscbGroup.SelectedIndex = 1;
+            SelectPlatform(e);
+            SelectGame(selectedGame);
+        }
+
+        private void UcGame_GenreSelected(object sender, Genre e)
+        {
+            Game selectedGame = ucGame.EditedGame;
+            tscbGroup.SelectedIndex = 2;
+            SelectGenre(e);
+            SelectGame(selectedGame);
         }
     }
 }

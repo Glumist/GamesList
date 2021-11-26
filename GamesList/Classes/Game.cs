@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Xml.Serialization;
 
 namespace GamesList.Classes
@@ -77,6 +74,7 @@ namespace GamesList.Classes
             Platforms = new List<GamePlatform>();
             Bundles = new List<GameBundle>();
             DefaultStatus = GamePlatform.GameStatus.NotPlayed;
+            Date = DateTime.Today;
         }
 
         public override string ToString()
@@ -95,7 +93,9 @@ namespace GamesList.Classes
         {
             get
             {
-                if (DefaultStatus == GamePlatform.GameStatus.Completed || Platforms.Exists(p => p.Status == GamePlatform.GameStatus.Completed))
+                if (Date > DateTime.Today)
+                    return GamePlatform.GameStatus.NotYetReleased;
+                else if (DefaultStatus == GamePlatform.GameStatus.Completed || Platforms.Exists(p => p.Status == GamePlatform.GameStatus.Completed))
                     return GamePlatform.GameStatus.Completed;
                 else if (DefaultStatus == GamePlatform.GameStatus.Finished || Platforms.Exists(p => p.Status == GamePlatform.GameStatus.Finished))
                     return GamePlatform.GameStatus.Finished;
@@ -161,10 +161,7 @@ namespace GamesList.Classes
         {
             get
             {
-                if (Date > DateTime.Today)
-                    return NotYetReleased;
-                else
-                    return ColorByStatus(Status);
+                return ColorByStatus(Status);
             }
         }
 
@@ -296,15 +293,11 @@ namespace GamesList.Classes
                 Finished,
                 Completed,
                 Watched,
+                NotYetReleased,
                 Unknown
             }
         }
-
-        public static Color NotYetReleased
-        {
-            get { return Color.LightPink; }
-        }
-
+        
         public static Color ColorByStatus(GamePlatform.GameStatus status)
         {
             switch (status)
@@ -316,8 +309,9 @@ namespace GamesList.Classes
                 case GamePlatform.GameStatus.Skipped: return Color.Silver;
                 case GamePlatform.GameStatus.WaitTranslation: return Color.LightGoldenrodYellow;
                 case GamePlatform.GameStatus.Finished: return Color.DeepSkyBlue;
-                case GamePlatform.GameStatus.Completed: return Color.DarkOrchid;
+                case GamePlatform.GameStatus.Completed: return Color.MediumOrchid;
                 case GamePlatform.GameStatus.Watched: return Color.SkyBlue;
+                case GamePlatform.GameStatus.NotYetReleased: return Color.LightPink;
                 case GamePlatform.GameStatus.Unknown:
                 default:
                     return Color.White;

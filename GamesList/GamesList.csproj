@@ -163,6 +163,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="IconGames.ico" />
+    <None Include="Resources\IconSave.png" />
     <None Include="Resources\IconThis.png" />
     <None Include="Resources\IconApply.png" />
     <None Include="Resources\IconCart.png" />
